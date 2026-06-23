@@ -1272,8 +1272,6 @@ if features['egl-ohos']
     features += {'ohos-osd-overlay': glesv3_ohos.found()}
     if glesv3_ohos.found()
         dependencies += glesv3_ohos
-        sources += files('video/out/ohos_osd.c',
-                         'video/out/vo_ohcodec_osd.c')
     endif
 endif
 
