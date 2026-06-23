@@ -494,8 +494,7 @@ if features['ohos']
                      cc.find_library('native_window')]
     sources += files('audio/out/ao_ohaudio.c',
                      'video/out/ohos_common.c',
-                     'video/out/hwdec/hwdec_ohcodec.c',
-                     'video/out/vo_ohcodec.c')
+                     'video/out/hwdec/hwdec_ohcodec.c')
 endif
 
 uwp_opt = get_option('uwp').require(
