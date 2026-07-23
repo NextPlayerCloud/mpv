@@ -99,6 +99,13 @@ static bool android_init(struct ra_ctx *ctx)
     if (!mpvk_init(vk, ctx, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME))
         goto fail;
 
+    // Android's compositor only needs the swapchain color space here. mpv has
+    // no display HDR capability query on this path, so source mastering data
+    // must not be submitted as VkHdrMetadataEXT display capabilities.
+    vk->disable_hdr_metadata = true;
+    MP_VERBOSE(ctx, "Disabling Vulkan HDR metadata on Android; "
+                    "using swapchain color space only\n");
+
     struct ra_ctx_params params = {
         .check_visible = android_check_visible,
         .set_color = android_set_color,

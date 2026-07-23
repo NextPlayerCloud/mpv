@@ -199,11 +199,31 @@ void ra_vk_ctx_uninit(struct ra_ctx *ctx)
     TA_FREEP(&ctx->swapchain);
 }
 
+#if HAVE_ANDROID_MEDIA_NDK
+static PFN_vkVoidFunction VKAPI_PTR get_device_proc_addr_no_hdr_metadata(
+    VkDevice device, const char *name)
+{
+    if (strcmp(name, "vkSetHdrMetadataEXT") == 0)
+        return NULL;
+    return vkGetDeviceProcAddr(device, name);
+}
+
+static PFN_vkVoidFunction VKAPI_PTR get_instance_proc_addr_no_hdr_metadata(
+    VkInstance instance, const char *name)
+{
+    if (strcmp(name, "vkGetDeviceProcAddr") == 0) {
+        return (PFN_vkVoidFunction) get_device_proc_addr_no_hdr_metadata;
+    }
+    return vkGetInstanceProcAddr(instance, name);
+}
+#endif
+
 pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
                              pl_vk_inst vkinst,
                              pl_log pllog,
                              VkSurfaceKHR surface,
-                             bool allow_software)
+                             bool allow_software,
+                             bool disable_hdr_metadata)
 {
     VkPhysicalDeviceFeatures2 features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -432,6 +452,12 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
         .features = &features,
         .device_name = is_uuid ? NULL : opts->device,
     };
+#if HAVE_ANDROID_MEDIA_NDK
+    if (disable_hdr_metadata)
+        device_params.get_proc_addr = get_instance_proc_addr_no_hdr_metadata;
+#else
+    mp_assert(!disable_hdr_metadata);
+#endif
     if (is_uuid)
         av_uuid_copy(device_params.device_uuid, param_uuid);
 
@@ -453,7 +479,8 @@ bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
     p->opts = mp_get_config_group(p, ctx->global, &vulkan_conf);
 
     vk->vulkan = mppl_create_vulkan(p->opts, vk->vkinst, vk->pllog, vk->surface,
-                                    ctx->opts.allow_sw);
+                                    ctx->opts.allow_sw,
+                                    vk->disable_hdr_metadata);
     if (!vk->vulkan)
         goto error;
 

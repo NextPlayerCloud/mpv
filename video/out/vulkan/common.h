@@ -36,4 +36,5 @@ struct mpvk_ctx {
     pl_gpu gpu; // points to vulkan->gpu for convenience
     pl_swapchain swapchain;
     VkSurfaceKHR surface;
+    bool disable_hdr_metadata;
 };
