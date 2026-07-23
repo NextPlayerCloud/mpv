@@ -417,7 +417,13 @@ static enum output_precision source_output_precision(
         depth = bits->sample_depth;
     depth = MPMAX(depth, ycbcr_format_depth(props->format));
 
-    if (desc->format == AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT ||
+    int32_t transfer = data_space & ADATASPACE_TRANSFER_MASK;
+    // Preserve out-of-range RGB values produced by YCbCr conversion until
+    // libplacebo applies the HDR transfer and target mapping.
+    if (pl_color_transfer_is_hdr(p->mapper->src_params.color.transfer) ||
+        transfer == ADATASPACE_TRANSFER_ST2084 ||
+        transfer == ADATASPACE_TRANSFER_HLG ||
+        desc->format == AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT ||
         desc->format == AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM ||
         props->format == VK_FORMAT_R16G16B16A16_SFLOAT ||
         props->format ==
@@ -425,14 +431,10 @@ static enum output_precision source_output_precision(
         depth > 10)
         return OUTPUT_PRECISION_FLOAT;
 
-    int32_t transfer = data_space & ADATASPACE_TRANSFER_MASK;
     if (depth > 8 ||
         desc->format == AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM ||
         desc->format == AHARDWAREBUFFER_FORMAT_YCbCr_P010 ||
-        desc->format == AHARDWAREBUFFER_FORMAT_YCbCr_P210 ||
-        pl_color_transfer_is_hdr(p->mapper->src_params.color.transfer) ||
-        transfer == ADATASPACE_TRANSFER_ST2084 ||
-        transfer == ADATASPACE_TRANSFER_HLG)
+        desc->format == AHARDWAREBUFFER_FORMAT_YCbCr_P210)
         return OUTPUT_PRECISION_10_BIT;
 
     return OUTPUT_PRECISION_8_BIT;
