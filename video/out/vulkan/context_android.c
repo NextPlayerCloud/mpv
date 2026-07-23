@@ -18,6 +18,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_android.h>
 
+#include "video/mp_image.h"
 #include "video/out/android_common.h"
 #include "common.h"
 #include "context.h"
@@ -69,6 +70,23 @@ static bool android_check_visible(struct ra_ctx *ctx)
            ra_vk_ctx_has_surface(ctx);
 }
 
+static bool android_set_color(struct ra_ctx *ctx,
+                              struct mp_image_params *params)
+{
+    struct priv *p = ctx->priv;
+    if (!params)
+        return true;
+    if (!p->vk.swapchain)
+        return false;
+
+    // Keep HDR metadata for rendering, but signal only the color space to the
+    // Android compositor. This matches the Android EGL path.
+    struct pl_color_space color = params->color;
+    color.hdr = (struct pl_hdr_metadata) {0};
+    pl_swapchain_colorspace_hint(p->vk.swapchain, &color);
+    return true;
+}
+
 static bool android_init(struct ra_ctx *ctx)
 {
     struct priv *p = ctx->priv = talloc_zero(ctx, struct priv);
@@ -83,6 +101,7 @@ static bool android_init(struct ra_ctx *ctx)
 
     struct ra_ctx_params params = {
         .check_visible = android_check_visible,
+        .set_color = android_set_color,
         // Rotated SurfaceViews may stay suboptimal even after recreation.
         // surfaceChanged drives explicit resizes through android_reconfig.
         .allow_suboptimal = true,
