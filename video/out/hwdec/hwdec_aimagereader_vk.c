@@ -51,6 +51,9 @@ struct source_config {
     int output_width;
     int output_height;
     enum output_precision output_precision;
+    int32_t data_space;
+    VkSamplerYcbcrModelConversion driver_ycbcr_model;
+    VkSamplerYcbcrRange driver_ycbcr_range;
 };
 
 struct vk_input {
@@ -708,6 +711,12 @@ static void apply_data_space(
         break;
     }
 
+    // Preserve the driver's suggested numerical range for opaque external
+    // formats. It is intended to match samplerExternalOES sampling, while the
+    // nominal AImage dataspace may not describe the driver's sampled range.
+    if (props->format == VK_FORMAT_UNDEFINED && props->externalFormat)
+        return;
+
     switch (data_space & ADATASPACE_RANGE_MASK) {
     case ADATASPACE_RANGE_FULL:
         props->suggestedYcbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
@@ -1026,6 +1035,9 @@ static bool query_source_config(
         return false;
     }
 
+    source->data_space = data_space;
+    source->driver_ycbcr_model = format->suggestedYcbcrModel;
+    source->driver_ycbcr_range = format->suggestedYcbcrRange;
     apply_data_space(format, data_space);
     source->output_precision =
         source_output_precision(p, desc, format, data_space);
@@ -1044,6 +1056,17 @@ static bool ensure_conversion_resources(struct aimagereader_vk *p,
         pl_gpu_finish(p->gpu);
         destroy_conversion_resources(p);
     }
+
+    const VkAndroidHardwareBufferFormatPropertiesANDROID *props =
+        &source->format_props;
+    mp_info(p->log, "Android hardware-buffer color conversion "
+                    "(AHB format %u, dataspace 0x%" PRIx32
+                    ", Vulkan format %d, external format 0x%" PRIx64
+                    ", model %d -> %d, range %d -> %d)\n",
+            source->desc.format, (uint32_t)source->data_space,
+            props->format, props->externalFormat,
+            source->driver_ycbcr_model, props->suggestedYcbcrModel,
+            source->driver_ycbcr_range, props->suggestedYcbcrRange);
 
     if (!create_outputs(p, source) ||
         !create_pipeline(p, &source->format_props)) {
