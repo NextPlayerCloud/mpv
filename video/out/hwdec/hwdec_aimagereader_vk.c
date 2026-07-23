@@ -1037,6 +1037,15 @@ static bool query_source_config(
         return false;
     }
 
+    if (format->format == VK_FORMAT_UNDEFINED && format->externalFormat &&
+        data_space == ADATASPACE_UNKNOWN &&
+        pl_color_transfer_is_hdr(p->mapper->src_params.color.transfer))
+    {
+        mp_warn(p->log, "Opaque HDR Android hardware buffer has no dataspace; "
+                        "disabling direct Vulkan import\n");
+        return false;
+    }
+
     source->data_space = data_space;
     source->driver_ycbcr_model = format->suggestedYcbcrModel;
     source->driver_ycbcr_range = format->suggestedYcbcrRange;
