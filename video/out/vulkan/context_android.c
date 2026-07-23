@@ -26,6 +26,7 @@
 
 struct priv {
     struct mpvk_ctx vk;
+    double reported_display_peak;
 };
 
 static VkSurfaceKHR android_create_surface(struct ra_ctx *ctx,
@@ -79,11 +80,26 @@ static bool android_set_color(struct ra_ctx *ctx,
     if (!p->vk.swapchain)
         return false;
 
-    // Keep HDR metadata for rendering, but signal only the color space to the
-    // Android compositor. This matches the Android EGL path.
-    struct pl_color_space color = params->color;
-    color.hdr = (struct pl_hdr_metadata) {0};
-    pl_swapchain_colorspace_hint(p->vk.swapchain, &color);
+    double display_peak = ctx->vo->opts->android_display_peak;
+    bool hdr = params->color.transfer == PL_COLOR_TRC_PQ ||
+               params->color.transfer == PL_COLOR_TRC_HLG;
+    if (hdr && display_peak > 0) {
+        params->color.hdr.max_luma = display_peak;
+        if (!params->color.hdr.max_cll ||
+            params->color.hdr.max_cll > display_peak)
+            params->color.hdr.max_cll = display_peak;
+        if (params->color.hdr.max_fall > params->color.hdr.max_cll)
+            params->color.hdr.max_fall = 0;
+        if (p->reported_display_peak != display_peak) {
+            MP_VERBOSE(ctx, "Using Android display HDR peak: %.3f nits\n",
+                       display_peak);
+            p->reported_display_peak = display_peak;
+        }
+    } else {
+        p->reported_display_peak = 0;
+    }
+
+    pl_swapchain_colorspace_hint(p->vk.swapchain, &params->color);
     return true;
 }
 
@@ -98,13 +114,6 @@ static bool android_init(struct ra_ctx *ctx)
 
     if (!mpvk_init(vk, ctx, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME))
         goto fail;
-
-    // Android's compositor only needs the swapchain color space here. mpv has
-    // no display HDR capability query on this path, so source mastering data
-    // must not be submitted as VkHdrMetadataEXT display capabilities.
-    vk->disable_hdr_metadata = true;
-    MP_VERBOSE(ctx, "Disabling Vulkan HDR metadata on Android; "
-                    "using swapchain color space only\n");
 
     struct ra_ctx_params params = {
         .check_visible = android_check_visible,

@@ -20,8 +20,7 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
                              pl_vk_inst vkinst,
                              pl_log pllog,
                              VkSurfaceKHR surface,
-                             bool allow_software,
-                             bool disable_hdr_metadata);
+                             bool allow_software);
 
 // Handles a resize request, and updates ctx->vo->dwidth/dheight
 bool ra_vk_ctx_resize(struct ra_ctx *ctx, int width, int height);
